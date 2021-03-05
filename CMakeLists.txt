@@ -7,3 +7,5 @@ add_executable(my_ldd
 
 target_compile_options(my_ldd PRIVATE -Wall -Wextra -pedantic)
 target_compile_features(my_ldd PRIVATE cxx_std_17)
+
+add_subdirectory(example)
