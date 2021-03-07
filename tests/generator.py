@@ -56,6 +56,15 @@ class Binary:
                 lines.append(f"\t{call}();")
 
             lines.append("}")
+        
+        if self.is_executable:
+            lines.append("int main() {")
+            lines.append(f"\tputs(\"main ({self.name})\");")
+
+            for fun in self.funs:
+                lines.append(f"\t{fun.name}();")
+
+            lines.append("}")
 
         return "\n".join(lines)
     
@@ -91,21 +100,27 @@ def generate_test(name, exe_count, lib_count, fun_count, dep_count):
     bins = []
     libs = []
 
-    for i in range(exe_count):
-        exe = Binary(f"exe_{i}", True)
-        exe.generate_funs(fun_count)
-        bins.append(exe)
-
     for i in range(lib_count):
         lib = Binary(f"lib_{i}", False)
         lib.generate_funs(fun_count)
         libs.append(lib)
-        bins.append(lib)
 
-    for this in bins:
         for i in range(dep_count):
             that = random.choice(libs)
-            this.add_dep(that)
+            lib.add_dep(that)
+
+        bins.append(lib)
+
+    for i in range(exe_count):
+        exe = Binary(f"exe_{i}", True)
+        exe.generate_funs(fun_count)
+
+        for i in range(dep_count):
+            that = random.choice(libs)
+            exe.add_dep(that)
+
+        bins.append(exe)
+
 
     if os.path.exists(name):
         shutil.rmtree(name)
