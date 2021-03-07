@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "dependencies.h"
+#include "util.h"
 
 static void find_dependency_locations(const ELFIO::elfio &reader,
                                       std::unordered_set<std::string> &unresolved_dependencies,
@@ -15,7 +16,7 @@ static void find_dependency_locations(const ELFIO::elfio &reader,
         for (auto &p: recursive_directory_iterator(directory)) {
             auto path = p.path().string();
             auto filename = p.path().filename().string();
-            if (unresolved_dependencies.contains(filename) && ELFIO::elfio().load(path)) {
+            if (unresolved_dependencies.contains(filename) && is_elf(path)) {
                 unresolved_dependencies.erase(filename);
                 resolved_dependencies[filename] = path;
             }

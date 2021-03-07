@@ -4,7 +4,7 @@ include(cmake/CPM.cmake)
 
 add_executable(my_ldd
     ./src/main.cpp
-        src/dependencies.cpp src/dependencies.h)
+        src/dependencies.cpp src/dependencies.h src/util.h src/util.cpp src/symbols.h src/symbols.cpp)
 
 target_compile_options(my_ldd PRIVATE -Wall -Wextra -pedantic)
 target_compile_features(my_ldd PRIVATE cxx_std_20)

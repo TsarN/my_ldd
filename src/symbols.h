@@ -1,0 +1,4 @@
+#ifndef MY_LDD_SYMBOLS_H
+#define MY_LDD_SYMBOLS_H
+
+#endif //MY_LDD_SYMBOLS_H
