@@ -9,14 +9,15 @@ int main(int argc, char *argv[]) {
     }
 
     auto dependencies = resolve(argv[1]);
-    for (const auto &[name, path]: dependencies.resolved_dependencies) {
-        if (name != path) {
-            std::cout << name << " => ";
+    for (const auto &library : dependencies) {
+        std::cout << library.get_name() << " => ";
+        if (library.is_resolved()) {
+            std::cout << library.get_path();
+        } else {
+            std::cout << "not found";
         }
-        std::cout << path << "\n";
-    }
-    for (const auto &name: dependencies.unresolved_dependencies) {
-        std::cout << name << " => not found\n";
+
+        std::cout << "\n";
     }
 
     return 0;

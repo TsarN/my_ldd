@@ -3,9 +3,9 @@
 #include <fstream>
 #include "util.h"
 
-bool is_elf(const std::string &filename) {
+bool is_elf(const std::filesystem::path &filename) {
     static const std::size_t SIGNATURE_SIZE = 4;
-    static std::array<char, SIGNATURE_SIZE> elf_signature{
+    static const std::array<char, SIGNATURE_SIZE> elf_signature{
         0x7f, 'E', 'L', 'F'
     };
 

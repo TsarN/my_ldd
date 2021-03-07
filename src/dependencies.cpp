@@ -1,35 +1,51 @@
-#include <elfio/elfio.hpp>
-#include <filesystem>
-#include <unordered_map>
-#include <unordered_set>
-
 #include "dependencies.h"
 #include "util.h"
 
-static void find_dependency_locations(const ELFIO::elfio &reader,
-                                      std::unordered_set<std::string> &unresolved_dependencies,
-                                      std::unordered_map<std::string, std::string> &resolved_dependencies) {
-    // TODO DT_RPATH & DT_RUNPATH
+#include <elfio/elfio.hpp>
 
-    using namespace std::filesystem;
-    for (const auto &directory : {"/lib", "/usr/lib"}) {
-        for (auto &p: recursive_directory_iterator(directory)) {
-            auto path = p.path().string();
-            auto filename = p.path().filename().string();
-            if (unresolved_dependencies.contains(filename) && is_elf(path)) {
-                unresolved_dependencies.erase(filename);
-                resolved_dependencies[filename] = path;
+Library::Library(std::string name) : name(std::move(name)) {}
+
+bool Library::is_resolved() const noexcept {
+    return path.has_value();
+}
+
+void Library::resolve(std::filesystem::path path) noexcept {
+    this->path = std::move(path);
+}
+
+const std::string& Library::get_name() const noexcept {
+    return name;
+}
+
+const std::filesystem::path& Library::get_path() const noexcept {
+    return path.value();
+}
+
+void Resolver::resolve(const std::filesystem::path& filename) {
+    collect_dependencies(filename);
+
+    for (const auto &directory : search_paths) {
+        for (auto &p: std::filesystem::directory_iterator(directory)) {
+            auto path = p.path();
+
+            if (!is_elf(path)) {
+                continue;
+            }
+
+            auto name = p.path().filename().string();
+
+            auto lib = libraries.find(name);
+            if (lib != libraries.end() && !lib->second.is_resolved()) {
+                lib->second.resolve(path);
+                resolve(path);
             }
         }
     }
 }
 
-Dependencies resolve(const std::string &filepath) {
+void Resolver::collect_dependencies(const std::filesystem::path& filename) {
     ELFIO::elfio reader;
-    reader.load(filepath);
-
-    std::unordered_set<std::string> unresolved_dependencies;
-    std::unordered_map<std::string, std::string> resolved_dependencies;
+    reader.load(filename);
 
     for (auto &section: reader.sections) {
         if (section->get_type() == SHT_DYNAMIC) {
@@ -37,25 +53,28 @@ Dependencies resolve(const std::string &filepath) {
 
             for (ELFIO::Elf_Xword i = 0; i < accessor.get_entries_num(); i++) {
                 ELFIO::Elf_Xword tag, value;
-                std::string str;
-                accessor.get_entry(i, tag, value, str);
+                std::string name;
+                accessor.get_entry(i, tag, value, name);
                 if (tag == DT_NEEDED) {
-                    if (str.find('/') != std::string::npos) {
-                        resolved_dependencies[str] = str;
-                    } else {
-                        unresolved_dependencies.insert(str);
+                    libraries.emplace(name, Library(name));
+                    if (std::filesystem::path{name}.is_absolute()) {
+                        libraries.at(name).resolve(name);
                     }
                 }
             }
         }
     }
-    find_dependency_locations(reader, unresolved_dependencies, resolved_dependencies);
+}
 
-    for (const auto &[name, path]: resolved_dependencies) {
-        auto result = resolve(path);
-        unresolved_dependencies.merge(result.unresolved_dependencies);
-        resolved_dependencies.merge(result.resolved_dependencies);
+std::vector<Library> resolve(const std::filesystem::path& filepath) {
+    std::vector<Library> result;
+
+    Resolver resolver;
+    resolver.resolve(filepath);
+
+    for (auto& [_, library] : resolver.libraries) {
+        result.emplace_back(std::move(library));
     }
 
-    return {unresolved_dependencies, resolved_dependencies};
+    return result;
 }
