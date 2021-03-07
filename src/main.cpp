@@ -7,8 +7,9 @@ int main(int argc, char *argv[]) {
         std::cout << "usage: my_ldd <filename>";
         return 0;
     }
-
-    auto dependencies = resolve(argv[1]);
+    std::cout << "DEPENDENCIES:\n";
+    std::unordered_map<symbol, std::string> symbols;
+    auto dependencies = resolve(argv[1], symbols);
     for (const auto &library : dependencies) {
         std::cout << library.get_name() << " => ";
         if (library.is_resolved()) {
@@ -19,6 +20,9 @@ int main(int argc, char *argv[]) {
 
         std::cout << "\n";
     }
-
+    std::cout << "DYNAMIC SYMBOLS:\n";
+    for (const auto& s: symbols) {
+        std::cout << s.first << " => " << s.second << "\n";
+    }
     return 0;
 }

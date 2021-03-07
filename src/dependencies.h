@@ -5,8 +5,12 @@
 #include <string>
 #include <optional>
 #include <vector>
+#include <unordered_set>
+#include <unordered_map>
 
 using LibraryName = std::string; // e.g. "libc.so.6"
+
+using symbol = std::string;
 
 class Library {
 public:
@@ -32,10 +36,12 @@ public:
         return name <=> that.name;
     }
 
+    std::unordered_set<symbol> get_symbols(bool dynamic_only) const noexcept;
+
 private:
     std::string name;
     std::optional<std::filesystem::path> path;
 };
 
-std::vector<Library> resolve(const std::filesystem::path& filepath);
+std::vector<Library> resolve(const std::filesystem::path& filepath, std::unordered_map<symbol, std::string>& symbols);
 
