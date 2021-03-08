@@ -1,25 +1,22 @@
 #include "dependencies.h"
 #include "util.h"
 
+#include <algorithm>
+#include <unordered_map>
+
 #include <elfio/elfio.hpp>
 
-Library::Library(std::string name) : name(std::move(name)) {}
+class Resolver {
+    friend std::vector<Library> resolve(const std::filesystem::path& filepath);
 
-bool Library::is_resolved() const noexcept {
-    return path.has_value();
-}
+private:
+    void resolve(const std::filesystem::path& filepath);
+    void collect_dependencies(const std::filesystem::path& filepath);
 
-void Library::resolve(std::filesystem::path path) noexcept {
-    this->path = std::move(path);
-}
-
-const std::string& Library::get_name() const noexcept {
-    return name;
-}
-
-const std::filesystem::path& Library::get_path() const noexcept {
-    return path.value();
-}
+private:
+    std::unordered_map<LibraryName, Library> libraries;
+    std::vector<std::filesystem::path> search_paths { "/lib", "/usr/lib" };
+};
 
 void Resolver::resolve(const std::filesystem::path& filename) {
     collect_dependencies(filename);
@@ -75,6 +72,8 @@ std::vector<Library> resolve(const std::filesystem::path& filepath) {
     for (auto& [_, library] : resolver.libraries) {
         result.emplace_back(std::move(library));
     }
+
+    std::sort(result.begin(), result.end());
 
     return result;
 }
