@@ -58,20 +58,24 @@ void Resolver::resolve(const std::filesystem::path& filename) {
     collect_dependencies(filename);
 
     for (const auto &directory : search_paths) {
-        for (auto &p: std::filesystem::directory_iterator(directory)) {
-            auto path = p.path();
+        try {
+            for (auto &p: std::filesystem::directory_iterator(directory)) {
+                auto path = p.path();
 
-            if (!is_elf(path)) {
-                continue;
+                if (!is_elf(path)) {
+                    continue;
+                }
+
+                auto name = p.path().filename().string();
+
+                auto lib = libraries.find(name);
+                if (lib != libraries.end() && !lib->second.is_resolved()) {
+                    lib->second.resolve(path);
+                    resolve(path);
+                }
             }
-
-            auto name = p.path().filename().string();
-
-            auto lib = libraries.find(name);
-            if (lib != libraries.end() && !lib->second.is_resolved()) {
-                lib->second.resolve(path);
-                resolve(path);
-            }
+        } catch(std::filesystem::filesystem_error& error) {
+            continue;
         }
     }
 }
