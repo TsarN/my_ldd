@@ -31,8 +31,7 @@ void Resolver::load_symbols(Library& library) {
 
     std::unordered_set<SymbolName> my_symbols;
     for (auto &section: reader.sections) {
-        if (section->get_type() == SHT_SYMTAB || section->get_type() == SHT_DYNSYM) {
-            bool is_dynamic = section->get_type() == SHT_DYNSYM;
+        if (section->get_type() == SHT_DYNSYM) {
             ELFIO::symbol_section_accessor accessor(reader, section);
 
             for (ELFIO::Elf_Xword i = 0; i < accessor.get_symbols_num(); i++) {
@@ -47,10 +46,12 @@ void Resolver::load_symbols(Library& library) {
 
                 accessor.get_symbol(i, name, value, size, bind, type, section_index, other);
 
-                if (!is_dynamic && bind != STB_GLOBAL) continue;
+                bool is_exported = section_index != SHN_UNDEF;
+
+                if (!is_exported && bind != STB_GLOBAL) continue;
 
                 my_symbols.insert(name);
-                library.add_symbol(Symbol { name, is_dynamic });
+                library.add_symbol(Symbol { name, is_exported });
             }
         }
     }
@@ -124,7 +125,7 @@ ResolveResult resolve(const std::filesystem::path& filepath, const std::vector<s
         if (library.is_resolved()) {
             resolver.load_symbols(library);
             for (const auto& [_, symbol] : library.get_symbols()) {
-                if (symbol.is_dynamic()) {
+                if (symbol.is_exported()) {
                     if (!dynamic_symbols.contains(symbol.get_name())) {
                         dynamic_symbols.emplace(symbol.get_name(), symbol);
                     }

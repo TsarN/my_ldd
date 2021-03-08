@@ -13,7 +13,7 @@ using SymbolName = std::string;
 
 class Symbol {
 public:
-    explicit Symbol(SymbolName name, bool dynamic) : name(std::move(name)), dynamic(dynamic) {}
+    explicit Symbol(SymbolName name, bool exported) : name(std::move(name)), exported(exported) {}
 
     const SymbolName& get_name() const noexcept {
         return name;
@@ -23,8 +23,8 @@ public:
         return library_names;
     }
 
-    bool is_dynamic() const noexcept {
-        return dynamic;
+    bool is_exported() const noexcept {
+        return exported;
     }
 
     void exported_from(LibraryName library) {
@@ -38,7 +38,7 @@ public:
 private:
     SymbolName name;
     std::vector<LibraryName> library_names;
-    bool dynamic;
+    bool exported;
 };
 
 class Library {
