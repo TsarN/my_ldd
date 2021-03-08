@@ -2,34 +2,37 @@
 #include "util.h"
 
 #include <algorithm>
+#include <stdexcept>
 #include <unordered_map>
 
 #include <elfio/elfio.hpp>
 
 class Resolver {
-    explicit Resolver(const std::filesystem::path& filepath);
-
-    friend std::vector<Library> resolve(const std::filesystem::path& filepath, std::unordered_map<symbol, std::string>& symbols);
+    friend ResolveResult resolve(const std::filesystem::path& filepath, const std::vector<std::filesystem::path>& search_paths);
 
 private:
     void resolve(const std::filesystem::path& filepath);
     void collect_dependencies(const std::filesystem::path& filepath);
-    std::unordered_map<symbol, std::string> predict_dependencies() const noexcept;
+    void load_symbols(Library& library);
+    std::unordered_map<SymbolName, std::string> predict_dependencies() const noexcept;
 
 private:
-    std::filesystem::path target;
     std::unordered_map<LibraryName, Library> libraries;
-    std::vector<std::filesystem::path> search_paths { "/lib", "/usr/lib", "/lib/x86_64-linux-gnu/" };
+    std::vector<std::filesystem::path> search_paths { "/lib", "/usr/lib", "/lib/x86_64-linux-gnu" };
 };
 
-std::unordered_set<symbol> Library::get_symbols(bool dynamic_only) const noexcept {
-    ELFIO::elfio reader;
-    if (!is_resolved()) return std::unordered_set<symbol>();
-    reader.load(get_path());
+void Resolver::load_symbols(Library& library) {
+    if (!library.is_resolved()) {
+        throw std::logic_error{"Cannot load symbols from unresolved library"};
+    }
 
-    std::unordered_set<symbol> my_symbols;
+    ELFIO::elfio reader;
+    reader.load(library.get_path());
+
+    std::unordered_set<SymbolName> my_symbols;
     for (auto &section: reader.sections) {
-        if ((!dynamic_only && section->get_type() == SHT_SYMTAB) || section->get_type() == SHT_DYNSYM) {
+        if (section->get_type() == SHT_SYMTAB || section->get_type() == SHT_DYNSYM) {
+            bool is_dynamic = section->get_type() == SHT_DYNSYM;
             ELFIO::symbol_section_accessor accessor(reader, section);
 
             for (ELFIO::Elf_Xword i = 0; i < accessor.get_symbols_num(); i++) {
@@ -44,14 +47,13 @@ std::unordered_set<symbol> Library::get_symbols(bool dynamic_only) const noexcep
 
                 accessor.get_symbol(i, name, value, size, bind, type, section_index, other);
 
-                if (!dynamic_only && bind != STB_GLOBAL) continue;
+                if (!is_dynamic && bind != STB_GLOBAL) continue;
 
                 my_symbols.insert(name);
+                library.add_symbol(Symbol { name, is_dynamic });
             }
         }
     }
-
-    return my_symbols;
 }
 
 void Resolver::resolve(const std::filesystem::path& filename) {
@@ -103,56 +105,51 @@ void Resolver::collect_dependencies(const std::filesystem::path& filename) {
     }
 }
 
-std::vector<Library> resolve(const std::filesystem::path& filepath, std::unordered_map<symbol, std::string>& symbols) {
-    std::vector<Library> result;
+ResolveResult resolve(const std::filesystem::path& filepath, const std::vector<std::filesystem::path>& search_paths) {
+    ResolveResult result;
 
-    Resolver resolver(filepath);
+    Resolver resolver;
+    resolver.search_paths.insert(resolver.search_paths.begin(), search_paths.begin(), search_paths.end());
     resolver.resolve(filepath);
 
+    std::unordered_map<SymbolName, Symbol> dynamic_symbols;
+
     for (auto& [_, library] : resolver.libraries) {
-        result.push_back(library);
+        result.dependencies.push_back(library);
     }
 
-    std::sort(result.begin(), result.end());
+    std::sort(result.dependencies.begin(), result.dependencies.end());
 
-    symbols = resolver.predict_dependencies();
+    for (auto& library : result.dependencies) {
+        if (library.is_resolved()) {
+            resolver.load_symbols(library);
+            for (const auto& [_, symbol] : library.get_symbols()) {
+                if (symbol.is_dynamic()) {
+                    if (!dynamic_symbols.contains(symbol.get_name())) {
+                        dynamic_symbols.emplace(symbol.get_name(), symbol);
+                    }
+
+                    dynamic_symbols.at(symbol.get_name()).exported_from(library.get_name());
+                }
+            }
+        }
+    }
+
+    Library me;
+    me.resolve(filepath);
+    resolver.load_symbols(me);
+
+    for (const auto& [_, symbol] : me.get_symbols()) {
+        if (symbol.get_name().empty()) {
+            continue;
+        }
+
+        if (dynamic_symbols.contains(symbol.get_name())) {
+            result.symbols.emplace_back(dynamic_symbols.at(symbol.get_name()));
+        }
+    }
+
+    std::sort(result.symbols.begin(), result.symbols.end());
 
     return result;
 }
-
-std::unordered_map<symbol, std::string> Resolver::predict_dependencies() const noexcept {
-    auto my_lib = Library("my_lib");
-    my_lib.resolve(target);
-    auto symbols = my_lib.get_symbols(true);
-
-    std::unordered_map<symbol, std::vector<std::string>> result;
-    for (auto& [_, library]: libraries) {
-        auto lib_symbols = library.get_symbols(false);
-        std::unordered_set<symbol> intersection;
-        for (auto& elem: symbols) {
-            if (lib_symbols.contains(elem)) {
-                if (!result.contains(elem)) {
-                    result.insert({elem, std::vector<std::string>()});
-                }
-                result[elem].push_back(library.get_name());
-            }
-        }
-    }
-    std::unordered_map<symbol, std::string> predictions;
-    for (auto& symbol: symbols) {
-        if (result.contains(symbol)) {
-            if (result[symbol].size() == 1) {
-                predictions[symbol] = result[symbol][0];
-            } else {
-                predictions[symbol] = "# Several libraries contain this symbol";
-            }
-        }
-        else {
-            predictions[symbol] = "# Unknown";
-        }
-    }
-    return predictions;
-}
-
-Resolver::Resolver(const std::filesystem::path& filepath) :
-    target(filepath) {}

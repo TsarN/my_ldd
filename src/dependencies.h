@@ -9,12 +9,41 @@
 #include <unordered_map>
 
 using LibraryName = std::string; // e.g. "libc.so.6"
+using SymbolName = std::string;
 
-using symbol = std::string;
+class Symbol {
+public:
+    explicit Symbol(SymbolName name, bool dynamic) : name(std::move(name)), dynamic(dynamic) {}
+
+    const SymbolName& get_name() const noexcept {
+        return name;
+    }
+
+    const std::vector<LibraryName>& get_library_names() const noexcept {
+        return library_names;
+    }
+
+    bool is_dynamic() const noexcept {
+        return dynamic;
+    }
+
+    void exported_from(LibraryName library) {
+        library_names.emplace_back(std::move(library));
+    }
+
+    std::strong_ordering operator<=>(const Symbol& that) const noexcept {
+        return name <=> that.name;
+    }
+
+private:
+    SymbolName name;
+    std::vector<LibraryName> library_names;
+    bool dynamic;
+};
 
 class Library {
 public:
-    explicit Library(std::string name) : name(std::move(name)) {}
+    explicit Library(SymbolName name = {}) : name(std::move(name)) {}
     
     bool is_resolved() const noexcept {
         return path.has_value();
@@ -24,7 +53,12 @@ public:
         this->path = std::move(path);
     }
 
-    const std::string& get_name() const noexcept {
+    void add_symbol(Symbol symbol) {
+        auto name = symbol.get_name();
+        symbols.emplace(std::move(name), std::move(symbol));
+    }
+
+    const SymbolName& get_name() const noexcept {
         return name;
     }
 
@@ -32,16 +66,24 @@ public:
         return path.value();
     }
 
+    const std::unordered_map<SymbolName, Symbol>& get_symbols() const noexcept {
+        return symbols;
+    }
+
     std::strong_ordering operator<=>(const Library& that) const noexcept {
         return name <=> that.name;
     }
 
-    std::unordered_set<symbol> get_symbols(bool dynamic_only) const noexcept;
-
 private:
-    std::string name;
+    SymbolName name;
     std::optional<std::filesystem::path> path;
+    std::unordered_map<SymbolName, Symbol> symbols;
 };
 
-std::vector<Library> resolve(const std::filesystem::path& filepath, std::unordered_map<symbol, std::string>& symbols);
+struct ResolveResult {
+    std::vector<Library> dependencies;
+    std::vector<Symbol> symbols;
+};
+
+ResolveResult resolve(const std::filesystem::path& filepath, const std::vector<std::filesystem::path>& search_paths = {});
 
