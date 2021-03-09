@@ -1,4 +1,0 @@
-libc.so.6 => "/lib/libc.so.6"
-
-__libc_start_main : libc.so.6
-puts : libc.so.6

@@ -1,4 +1,0 @@
-add_library(lib_0 SHARED lib_0.c)
-add_library(lib_1 SHARED lib_1.c)
-add_executable(exe_0 exe_0.c)
-target_link_libraries(exe_0 lib_0)
