@@ -15,15 +15,15 @@ class Symbol {
 public:
     explicit Symbol(SymbolName name, bool exported) : name(std::move(name)), exported(exported) {}
 
-    const SymbolName& get_name() const noexcept {
+    [[nodiscard]] const SymbolName& get_name() const noexcept {
         return name;
     }
 
-    const std::vector<LibraryName>& get_library_names() const noexcept {
+    [[nodiscard]] const std::vector<LibraryName>& get_library_names() const noexcept {
         return library_names;
     }
 
-    bool is_exported() const noexcept {
+    [[nodiscard]] bool is_exported() const noexcept {
         return exported;
     }
 
