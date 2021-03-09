@@ -4,6 +4,8 @@ set -e
 
 pushd "$(dirname "$0")" >/dev/null
 
+rm -rf build generated
+
 mkdir -p build
 cd build
 
@@ -13,6 +15,9 @@ make my_ldd
 MY_LDD="$PWD/my_ldd"
 
 cd ..
+mkdir -p generated
+cd generated
+python3 ../generator.py
 
 for t in generated_*; do
     echo "$t"
