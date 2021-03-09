@@ -23,3 +23,9 @@ make
 ```shell
 ./my_ldd -s my_ldd
 ```
+
+## Как запустить тесты локально:
+
+```shell
+./tests/run.sh
+```
