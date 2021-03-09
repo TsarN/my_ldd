@@ -4,6 +4,7 @@ import os
 import sys
 import random
 import shutil
+import subprocess
 
 
 class Function:
@@ -43,9 +44,9 @@ class Binary:
                 fun_deps.add(call.name)
 
         return sorted(list(fun_deps))
-    
+
     def get_lib_deps(self):
-        deps = ["libc.so.6 => \"/lib/libc.so.6\""]
+        deps = [f"libc.so.6 => \"{get_libc_path()}\""]
 
         for dep in self.deps:
             if dep.name != self.name:
@@ -53,7 +54,7 @@ class Binary:
                 deps += dep.get_lib_deps()
 
         return sorted(set(deps))
-    
+
     def get_symbol_deps(self):
         deps = ["__libc_start_main : libc.so.6", "puts : libc.so.6"]
 
@@ -81,7 +82,7 @@ class Binary:
                 lines.append(f"\t{call.name}();")
 
             lines.append("}")
-        
+
         if self.is_executable:
             lines.append("int main() {")
             lines.append(f"\tputs(\"main ({self.name})\");")
@@ -92,7 +93,7 @@ class Binary:
             lines.append("}")
 
         return "\n".join(lines)
-    
+
     def get_cmake(self):
         lines = []
         if self.is_executable:
@@ -163,6 +164,13 @@ def generate_test(name, exe_count, lib_count, fun_count, dep_count):
     with open(os.path.join(name, "CMakeLists.txt"), "w") as f:
         print("\n".join(cmake), file=f)
 
+
+def get_libc_path():
+    if not hasattr(get_libc_path, 'path'):
+        get_libc_path.path = subprocess.check_output(
+            "ldd /bin/bash | grep -Po '(?<=libc\.so\.6 => )([^\s]*)'", shell=True
+        ).decode("ascii").rstrip()
+    return get_libc_path.path
 
 
 def main():
