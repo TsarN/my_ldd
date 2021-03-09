@@ -174,6 +174,8 @@ def get_libc_path():
 
 
 def main():
+    random.seed(420)
+
     for i in range(5):
         generate_test(f"generated_no_deps_{i}", 1, 0, i, 0)
 
